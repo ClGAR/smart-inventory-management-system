@@ -5,12 +5,19 @@ import { matchesQuery } from '../utils/validators.js'
 
 export default function Inventory({
   inventory,
+  categories = CATEGORIES.map((name) => ({ name })),
   query,
   activeCategory,
   setActiveCategory,
   openInventoryDrawer,
   deleteInventoryItem,
 }) {
+  const categoryFilters = Array.from(
+    new Set([
+      ...CATEGORIES,
+      ...categories.map((category) => category.name).filter(Boolean),
+    ]),
+  )
   const visibleInventory = inventory.filter((item) => {
     const matchesCategory =
       activeCategory === 'ALL' || item.category.toUpperCase() === activeCategory
@@ -42,7 +49,7 @@ export default function Inventory({
       </div>
 
       <div className="mb-8 flex flex-wrap gap-2.5">
-        {['ALL', ...CATEGORIES.map((category) => category.toUpperCase())].map((category) => (
+        {['ALL', ...categoryFilters.map((category) => category.toUpperCase())].map((category) => (
           <button
             key={category}
             type="button"

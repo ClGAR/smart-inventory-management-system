@@ -14,6 +14,20 @@ import { getStatus } from '../utils/validators.js'
 
 export default function Dashboard({ inventory, stats, openRestock }) {
   const alerts = inventory.filter((item) => getStatus(item.units) !== 'OPTIMAL')
+  const chartData = Object.values(
+    inventory.reduce((groups, item) => {
+      const category = item.category || 'Uncategorized'
+      const value = Number(item.units) * Number(item.price)
+
+      groups[category] = groups[category] || { label: category, value: 0 }
+      groups[category].value += value
+
+      return groups
+    }, {}),
+  )
+  const maxValue = Math.max(...chartData.map((bar) => bar.value), 0)
+  const tickMax = maxValue > 0 ? Math.ceil(maxValue / 50000) * 50000 : 100000
+  const ticks = Array.from({ length: 5 }, (_, index) => (tickMax / 4) * index)
 
   return (
     <div className="space-y-6">
@@ -98,7 +112,7 @@ export default function Dashboard({ inventory, stats, openRestock }) {
           </div>
           <div className="h-[245px] overflow-hidden">
             <svg viewBox="0 0 640 245" className="h-full w-full" role="img">
-              {[0, 50000, 100000, 150000, 200000].map((tick, index) => {
+              {ticks.map((tick, index) => {
                 const y = 215 - index * 43
                 return (
                   <g key={tick}>
@@ -117,28 +131,32 @@ export default function Dashboard({ inventory, stats, openRestock }) {
                       fontSize="9"
                       fontFamily="system-ui, sans-serif"
                     >
-                      ${tick / 1000}k
+                      ${Math.round(tick / 1000)}k
                     </text>
                   </g>
                 )
               })}
-              {[
-                { label: 'Energy', x: 88, y: 55, height: 160 },
-                { label: 'Cybernetics', x: 254, y: 136, height: 79 },
-                { label: 'Biotech', x: 420, y: 181, height: 34 },
-                { label: 'Hardware', x: 586, y: 211, height: 4 },
-              ].map((bar) => (
-                <g key={bar.label}>
+              {chartData.map((bar, index) => {
+                const x =
+                  chartData.length === 1
+                    ? 292
+                    : 88 + index * (498 / Math.max(chartData.length - 1, 1))
+                const height =
+                  bar.value > 0 ? Math.max(4, (bar.value / tickMax) * 160) : 0
+                const y = 215 - height
+
+                return (
+                  <g key={bar.label}>
                   <rect
-                    x={bar.x}
-                    y={bar.y}
+                    x={x}
+                    y={y}
                     width="56"
-                    height={bar.height}
+                    height={height}
                     rx="8"
                     fill="#9A8879"
                   />
                   <text
-                    x={bar.x + 28}
+                    x={x + 28}
                     y="236"
                     fill="#6B6560"
                     fontSize="8.5"
@@ -148,7 +166,8 @@ export default function Dashboard({ inventory, stats, openRestock }) {
                     {bar.label}
                   </text>
                 </g>
-              ))}
+                )
+              })}
             </svg>
           </div>
         </section>

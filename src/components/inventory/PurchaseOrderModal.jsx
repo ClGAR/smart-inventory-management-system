@@ -47,15 +47,17 @@ export default function PurchaseOrderModal({
         <form onSubmit={submitForm} className="mt-6 space-y-4">
           <Field label="Target Supplier Contract">
             <select
+              required
               value={form.supplier}
               onChange={(event) =>
                 setForm((current) => ({ ...current, supplier: event.target.value }))
               }
               className="field"
             >
+              <option value="">Select supplier</option>
               {suppliers.map((supplier) => (
-                <option key={supplier.name} value={supplier.name}>
-                  {supplier.name} ({supplier.type.replace(' Supplier', '')})
+                <option key={supplier.id || supplier.name} value={supplier.name}>
+                  {supplier.name} ({supplier.type?.replace(' Supplier', '') || 'Supplier'})
                 </option>
               ))}
             </select>

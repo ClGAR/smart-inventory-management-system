@@ -16,11 +16,11 @@ export const BLANK_INVENTORY_FORM = {
   units: 0,
   minThreshold: 20,
   price: 100,
-  supplier: 'Aether Kinetics',
+  supplier: '',
 }
 
 export const BLANK_PO_FORM = {
-  supplier: 'Aether Kinetics',
+  supplier: '',
   items: 1,
   cost: 100,
 }

@@ -1,170 +1,160 @@
-import { todayStamp } from '../utils/formatters.js'
+import { supabase } from '../lib/supabaseClient.js'
 import { getStatus } from '../utils/validators.js'
 
-const seedInventory = [
-  {
-    rack: 'A-04',
-    name: 'Quantum Core V2',
-    id: 'INV-101',
-    category: 'Energy',
-    units: 140,
-    price: 1250,
-    supplier: 'Aether Kinetics',
-    minThreshold: 30,
-    maxTarget: 160,
-  },
-  {
-    rack: 'B-12',
-    name: 'Holo-Optic Lens',
-    id: 'INV-102',
-    category: 'Cybernetics',
-    units: 24,
-    price: 450,
-    supplier: 'Synapse Tech',
-    minThreshold: 30,
-    maxTarget: 80,
-  },
-  {
-    rack: 'C-02',
-    name: 'Bio-Synth Gel Pack',
-    id: 'INV-103',
-    category: 'Biotech',
-    units: 8,
-    price: 85,
-    supplier: 'Nova BioLabs',
-    minThreshold: 30,
-    maxTarget: 60,
-  },
-  {
-    rack: 'B-09',
-    name: 'Neural Link Adapter',
-    id: 'INV-104',
-    category: 'Cybernetics',
-    units: 85,
-    price: 920,
-    supplier: 'Synapse Tech',
-    minThreshold: 30,
-    maxTarget: 100,
-  },
-  {
-    rack: 'A-15',
-    name: 'Graphene Matrix Panel',
-    id: 'INV-105',
-    category: 'Energy',
-    units: 12,
-    price: 680,
-    supplier: 'Aether Kinetics',
-    minThreshold: 30,
-    maxTarget: 40,
-  },
-  {
-    rack: 'D-01',
-    name: 'Titanium Shell Chassis',
-    id: 'INV-106',
-    category: 'Hardware',
-    units: 3,
-    price: 1500,
-    supplier: 'Apex Photonics',
-    minThreshold: 30,
-    maxTarget: 35,
-  },
-  {
-    rack: 'C-08',
-    name: 'Myo-Elastic Fiber Bundle',
-    id: 'INV-107',
-    category: 'Biotech',
-    units: 110,
-    price: 340,
-    supplier: 'Nova BioLabs',
-    minThreshold: 30,
-    maxTarget: 130,
-  },
-]
+const INVENTORY_SELECT = `
+  *,
+  categories(name),
+  suppliers(name)
+`
 
-const seedSuppliers = [
-  {
-    name: 'Aether Kinetics',
-    type: 'Energy Supplier',
-    score: 4.9,
-    email: 'procure@aether.io',
-    activeOrders: 2,
-  },
-  {
-    name: 'Apex Photonics',
-    type: 'Hardware Supplier',
-    score: 4.7,
-    email: 'sales@apexphoto.com',
-    activeOrders: 1,
-  },
-  {
-    name: 'Nova BioLabs',
-    type: 'Biotech Supplier',
-    score: 4.5,
-    email: 'supply@novabio.org',
-    activeOrders: 3,
-  },
-  {
-    name: 'Synapse Tech',
-    type: 'Cybernetics Supplier',
-    score: 4.8,
-    email: 'b2b@synapsetech.co',
-    activeOrders: 0,
-  },
-]
-
-const seedPurchaseOrders = [
-  {
-    hash: 'PO-2026-01',
-    supplier: 'Aether Kinetics',
-    date: '2026-06-10',
-    items: 3,
-    cost: 3750,
-    status: 'SHIPPED',
-  },
-  {
-    hash: 'PO-2026-02',
-    supplier: 'Nova BioLabs',
-    date: '2026-06-12',
-    items: 5,
-    cost: 425,
-    status: 'PROCESSING',
-  },
-  {
-    hash: 'PO-2026-03',
-    supplier: 'Apex Photonics',
-    date: '2026-06-08',
-    items: 1,
-    cost: 1500,
-    status: 'DELIVERED',
-  },
-]
+function toInventoryItem(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    rack: row.rack,
+    categoryId: row.category_id,
+    category: row.categories?.name || '',
+    units: row.units,
+    price: row.price,
+    minThreshold: row.min_threshold,
+    maxTarget: row.max_target,
+    supplierId: row.supplier_id,
+    supplier: row.suppliers?.name || '',
+    createdAt: row.created_at,
+  }
+}
 
 function nextInventoryId(inventory) {
   const maxId = inventory.reduce((max, item) => {
-    const value = Number(item.id.replace('INV-', ''))
+    const value = Number(String(item.id).replace('INV-', ''))
     return Number.isNaN(value) ? max : Math.max(max, value)
   }, 100)
   return `INV-${String(maxId + 1).padStart(3, '0')}`
 }
 
-function nextPoHash(purchaseOrders) {
-  const maxId = purchaseOrders.reduce((max, order) => {
-    const value = Number(order.hash.replace('PO-2026-', ''))
-    return Number.isNaN(value) ? max : Math.max(max, value)
-  }, 0)
-  return `PO-2026-${String(maxId + 1).padStart(2, '0')}`
+async function resolveCategoryId(category) {
+  const categoryName = category?.trim()
+  if (!categoryName) return null
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('name', categoryName)
+    .maybeSingle()
+
+  if (error) throw error
+  if (data) return data.id
+
+  const { data: createdCategory, error: createError } = await supabase
+    .from('categories')
+    .insert({ name: categoryName })
+    .select('id')
+    .single()
+
+  if (createError) throw createError
+  return createdCategory.id
+}
+
+async function resolveSupplierId(supplier) {
+  if (!supplier) return null
+
+  const { data, error } = await supabase
+    .from('suppliers')
+    .select('id')
+    .eq('name', supplier)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(`Supplier "${supplier}" was not found in Supabase.`)
+  return data.id
+}
+
+async function buildInventoryPayload(form) {
+  const minThreshold = Number(form.minThreshold ?? form.min_threshold ?? 0)
+  const units = Number(form.units ?? 0)
+
+  return {
+    name: form.name,
+    rack: form.rack,
+    category_id: form.categoryId || form.category_id || (await resolveCategoryId(form.category)),
+    units,
+    price: Number(form.price ?? 0),
+    min_threshold: minThreshold,
+    max_target: Number(
+      form.maxTarget ?? form.max_target ?? Math.max(minThreshold * 2, units),
+    ),
+    supplier_id: form.supplierId || form.supplier_id || (await resolveSupplierId(form.supplier)),
+  }
+}
+
+export async function getAll() {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select(INVENTORY_SELECT)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data.map(toInventoryItem)
+}
+
+export async function getById(id) {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select(INVENTORY_SELECT)
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return toInventoryItem(data)
+}
+
+export async function create(form, inventory = []) {
+  const payload = {
+    id: form.id || nextInventoryId(inventory),
+    ...(await buildInventoryPayload(form)),
+  }
+
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .insert(payload)
+    .select(INVENTORY_SELECT)
+    .single()
+
+  if (error) throw error
+  return toInventoryItem(data)
+}
+
+export async function update(id, form) {
+  const payload = await buildInventoryPayload(form)
+
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .update(payload)
+    .eq('id', id)
+    .select(INVENTORY_SELECT)
+    .single()
+
+  if (error) throw error
+  return toInventoryItem(data)
+}
+
+export async function remove(id) {
+  const { error } = await supabase.from('inventory_items').delete().eq('id', id)
+
+  if (error) throw error
+  return id
 }
 
 export function getInitialInventory() {
-  return seedInventory.map((item) => ({ ...item }))
+  return []
 }
 
 export function getInitialSuppliers() {
-  return seedSuppliers.map((supplier) => ({ ...supplier }))
+  return []
 }
 
 export function getInitialPurchaseOrders() {
-  return seedPurchaseOrders.map((order) => ({ ...order }))
+  return []
 }
 
 export function calculateInventoryStats(inventory) {
@@ -198,13 +188,6 @@ export function updateInventoryRecord(item, form) {
   return { ...item, ...form }
 }
 
-export function createPurchaseOrderRecord(purchaseOrders, form) {
-  return {
-    hash: nextPoHash(purchaseOrders),
-    supplier: form.supplier,
-    date: todayStamp(),
-    items: form.items,
-    cost: form.cost,
-    status: 'PROCESSING',
-  }
+export function createPurchaseOrderRecord() {
+  throw new Error('createPurchaseOrderRecord has moved to orderService.js.')
 }

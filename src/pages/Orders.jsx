@@ -16,7 +16,7 @@ export default function Orders({ purchaseOrders, query, openPoModal }) {
             Active Purchase Order Logs
           </h2>
           <p className="mt-1 text-[11px] text-text-secondary">
-            Simulated dispatch logs tracking live cargo shipments and supplier status
+            Live dispatch logs tracking cargo shipments and supplier status
           </p>
         </div>
         <div className="sm:pt-1">
